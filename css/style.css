@@ -1,0 +1,14 @@
+.column {
+    float: left;
+    width: 30%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    height: 300px;
+    overflow-y: auto;
+}
+.card {
+    background-color: #f9f9f9;
+    margin: 5px;
+    padding: 10px;
+    border: 1px solid #ddd;
+}
