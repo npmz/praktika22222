@@ -1,14 +1,13 @@
 Vue.component('Card', {
     template: `
     <div class="card">
-        <textarea v-model="card.content" placeholder="Введите заметку"></textarea>
+        <textarea v-model="card.content" placeholder="Введите заметку" :disabled="card.isDone"></textarea>
         <ul>
-            <li v-for="(item, index) in card.items" :key="index">
-                <input type="checkbox" v-model="item.completed" @change="updateCompletion" />
-                <span :class="{ completed: item.completed }">{{ item.text }}</span>
-            </li>
-        </ul>
-        <button @click="addItem">Добавить пункт</button>
+             <li v-for="(item, index) in card.items" :key="index">
+                 <input type="checkbox" v-model="item.completed" @change="updateCompletion" :disabled="!card.isDone" />
+                 <span :class="{ completed: item.completed }">{{ item.text }}</span>
+             </li>
+         </ul>
         <div v-if="card.completedDate">
             Завершено: {{ card.completedDate }}
         </div>
@@ -18,41 +17,38 @@ Vue.component('Card', {
         card: Object,
     },
     methods: {
-        addItem() {
-            const newItem = { text: `Пункт ${this.card.items.length + 1}`, completed: false };
-            this.card.items.push(newItem);
-        },
-
         updateCompletion() {
             this.$emit('update-completion', this.card.id);
         },
-    },
+
+        markAsDone() {
+            this.$emit('mark-as-done', this.card.id);
+        },
+    }
 })
 
 Vue.component('column', {
     template: `
     <div class="column">
         <div v-for="card in cards" :key="card.id">
-          <Card :card="card" @move="handleMove(card.id)" @update-completion="handleUpdateCompletion(card.id)" />
+          <Card :card="card" @move="handleMove(card.id)" @update-completion="handleUpdateCompletion(card.id)" @mark-as-done="handleMarkAsDone(card.id)" />
         </div>
-        <button v-if="cards.length < maxCards" @click="addCard">Добавить карточку</button>
     </div>
     `,
 
     props: {
         cards: Array,
-        maxCards: Number,
         columnIndex: Number,
     },
     methods: {
-        addCard() {
-            this.$emit('add-card');
-        },
         handleMove(cardId) {
             this.$emit('move-card', { cardId, fromColumnIndex: this.columnIndex });
         },
         handleUpdateCompletion(cardId) {
             this.$emit('update-completion', cardId);
+        },
+        handleMarkAsDone(cardId) {
+            this.$emit('mark-as-done', cardId);
         },
     },
 })
@@ -64,32 +60,58 @@ Vue.component('notepad', {
                 v-for="(column, index) in columns"
                 :key="index"
                 :cards="column.cards"
-                :maxCards="column.maxCards"
                 :columnIndex="index"
-                @add-card="addCard(index)"
                 @move-card="moveCard"
                 @update-completion="handleUpdateCompletion"
+                @mark-as-done="handleMarkAsDone"
              />
+            <div class="card-creator">
+                <textarea v-model="newCardContent" placeholder="Введите текст для новой карточки"></textarea>
+                <ul>
+                    <li v-for="(item, index) in newCardItems" :key="index">
+                        <input v-model="item.text" placeholder="Введите пункт" :disabled="isCardLocked" />
+                        <button @click="removeItem(index)" :disabled="isCardLocked">Удалить</button>
+                    </li>
+                </ul>
+                <button @click="addItem" :disabled="isCardLocked">Добавить пункт</button>
+                <button @click="addCard">Добавить карточку</button>
+            </div>
         </div>
     `,
     data() {
         return {
             columns: [
-                { cards: [], maxCards: 3 },
-                { cards: [], maxCards: 5 },
-                { cards: [], maxCards: Infinity },
+                { cards: [] },
+                { cards: [] },
+                { cards: [] },
             ],
+            newCardContent: '',
+            newCardItems: [],
+            isCardLocked: false, // Блокировка редактирования после добавления карточки
         };
     },
     methods: {
-        addCard(columnIndex) {
+        addItem() {
+            this.newCardItems.push({ text: '', completed: false });
+        },
+        removeItem(index) {
+            this.newCardItems.splice(index, 1);
+        },
+        addCard() {
             const newCard = {
                 id: Date.now(),
-                content: '',
-                items: [],
+                content: this.newCardContent,
+                items: this.newCardItems.map(item => ({ ...item })), // Копируем пункты
                 completedDate: null,
+                isDone: true, // Блокируем карточку после добавления
             };
-            this.columns[columnIndex].cards.push(newCard);
+            this.columns[0].cards.push(newCard);
+            this.resetCardCreator();
+        },
+        resetCardCreator() {
+            this.newCardContent = '';
+            this.newCardItems = [];
+            this.isCardLocked = false; // Сброс блокировки (если нужно)
         },
         moveCard({ cardId, fromColumnIndex }) {
             const card = this.columns[fromColumnIndex].cards.find(c => c.id === cardId);
@@ -100,20 +122,27 @@ Vue.component('notepad', {
         },
         handleUpdateCompletion(cardId) {
             const card = this.columns.flatMap(col => col.cards).find(c => c.id === cardId);
-            if (card) {
+            if (card && card.isDone) { // Проверяем, что карточка завершена
                 const completedCount = card.items.filter(item => item.completed).length;
                 const totalCount = card.items.length;
 
                 if (totalCount > 0) {
                     const completionPercentage = (completedCount / totalCount) * 100;
 
-                    if (completionPercentage > 50 && this.columns[0].cards.includes(card)) {
+                    if (completionPercentage >= 50 && this.columns[0].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 0 });
                     } else if (completionPercentage === 100 && this.columns[1].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 1 });
                         card.completedDate = new Date().toLocaleString();
                     }
                 }
+            }
+        },
+        handleMarkAsDone(cardId) {
+            const card = this.columns.flatMap(col => col.cards).find(c => c.id === cardId);
+            if (card) {
+                card.isDone = true; // Помечаем карточку как завершенную
+                this.handleUpdateCompletion(cardId); // Активируем проверку условий перемещения
             }
         },
     },
