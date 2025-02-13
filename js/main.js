@@ -95,7 +95,7 @@ Vue.component('notepad', {
             columns: [
                 { cards: [], maxCards: 3 },
                 { cards: [], maxCards: 5 },
-                { cards: [], maxCards: Infinity },
+                { cards: [], maxCards: 9999 },
             ],
             newCardContent: '',
             newCardItems: [],
@@ -105,7 +105,6 @@ Vue.component('notepad', {
     },
     computed: {
         isAddCardDisabled() {
-
             return (
                 this.columns[0].cards.length >= this.columns[0].maxCards ||
                 this.newCardItems.length < 3 ||
@@ -148,6 +147,7 @@ Vue.component('notepad', {
                 };
                 this.columns[0].cards.push(newCard);
                 this.resetCardCreator();
+                this.saveData();
             } else {
                 this.errorMessage = 'Первый столбец переполнен.';
             }
@@ -163,17 +163,16 @@ Vue.component('notepad', {
             if (card) {
                 this.columns[fromColumnIndex].cards = this.columns[fromColumnIndex].cards.filter(c => c.id !== cardId);
 
-
                 if (fromColumnIndex + 1 < this.columns.length) {
                     const nextColumn = this.columns[fromColumnIndex + 1];
                     if (nextColumn.cards.length < nextColumn.maxCards) {
                         nextColumn.cards.push(card);
                     } else {
                         alert(`Столбец ${fromColumnIndex + 2} переполнен!`);
-
                         this.columns[fromColumnIndex].cards.push(card);
                     }
                 }
+                this.saveData();
             }
         },
         handleUpdateCompletion(cardId) {
@@ -185,16 +184,14 @@ Vue.component('notepad', {
                 if (totalCount > 0) {
                     const completionPercentage = (completedCount / totalCount) * 100;
 
-
-                    if (completionPercentage > 50 && this.columns[0].cards.includes(card)) {
+                    if (completionPercentage >= 50 && this.columns[0].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 0 });
-                    }
-
-                    else if (completionPercentage === 100 && this.columns[1].cards.includes(card)) {
+                    } else if (completionPercentage === 100 && this.columns[1].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 1 });
                         card.completedDate = new Date().toLocaleString();
                     }
                 }
+                this.saveData();
             }
         },
         handleMarkAsDone(cardId) {
@@ -202,8 +199,21 @@ Vue.component('notepad', {
             if (card) {
                 card.isDone = true;
                 this.handleUpdateCompletion(cardId);
+                this.saveData();
             }
         },
+        saveData() {
+            localStorage.setItem('notepadData', JSON.stringify(this.columns));
+        },
+        loadData() {
+            const savedData = localStorage.getItem('notepadData');
+            if (savedData) {
+                this.columns = JSON.parse(savedData);
+            }
+        },
+    },
+    mounted() {
+        this.loadData();
     },
 });
 
