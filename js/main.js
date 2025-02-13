@@ -8,7 +8,8 @@ Vue.component('Card', {
                     type="checkbox" 
                     v-model="item.completed" 
                     :disabled="card.isLocked || item.completed" 
-                    @change="handleCheckboxChange(item)" 
+                    @change="handleCheckboxChange(item)"
+                    @change="updateCompletion()" 
                 />
                 <span :class="{ completed: item.completed }">{{ item.text }}</span>
             </li>
@@ -39,7 +40,9 @@ Vue.component('column', {
     template: `
     <div class="column">
         <div v-for="card in cards" :key="card.id">
-          <Card :card="card" @move="handleMove(card.id)" @update-completion="handleUpdateCompletion(card.id)" @mark-as-done="handleMarkAsDone(card.id)" />
+          <Card :card="card" @move="handleMove(card.id)"
+                @update-completion="handleUpdateCompletion(card.id)"
+                @mark-as-done="handleMarkAsDone(card.id)" />
         </div>
     </div>
     `,
@@ -90,22 +93,19 @@ Vue.component('notepad', {
     data() {
         return {
             columns: [
-                { cards: [], maxCards: 3 }, // Первый столбец: не более 3 карточек
-                { cards: [], maxCards: 5 }, // Второй столбец: не более 5 карточек
-                { cards: [], maxCards: Infinity }, // Третий столбец: без ограничений
+                { cards: [], maxCards: 3 },
+                { cards: [], maxCards: 5 },
+                { cards: [], maxCards: Infinity },
             ],
             newCardContent: '',
             newCardItems: [],
             isCardLocked: false,
-            errorMessage: '', // Сообщение об ошибке
+            errorMessage: '',
         };
     },
     computed: {
         isAddCardDisabled() {
-            // Кнопка "Добавить карточку" блокируется, если:
-            // 1. Первый столбец переполнен
-            // 2. Количество пунктов меньше 3 или больше 5
-            // 3. Заголовок карточки пустой
+
             return (
                 this.columns[0].cards.length >= this.columns[0].maxCards ||
                 this.newCardItems.length < 3 ||
@@ -118,14 +118,14 @@ Vue.component('notepad', {
         addItem() {
             if (this.newCardItems.length < 5) {
                 this.newCardItems.push({ text: '', completed: false });
-                this.errorMessage = ''; // Сброс сообщения об ошибке
+                this.errorMessage = '';
             } else {
                 this.errorMessage = 'Максимальное количество пунктов — 5.';
             }
         },
         removeItem(index) {
             this.newCardItems.splice(index, 1);
-            this.errorMessage = ''; // Сброс сообщения об ошибке
+            this.errorMessage = '';
         },
         addCard() {
             if (this.newCardItems.length < 3 || this.newCardItems.length > 5) {
@@ -142,9 +142,9 @@ Vue.component('notepad', {
                 const newCard = {
                     id: Date.now(),
                     content: this.newCardContent,
-                    items: this.newCardItems.map(item => ({ ...item })), // Копируем пункты
+                    items: this.newCardItems.map(item => ({ ...item })),
                     completedDate: null,
-                    isDone: false, // Карточка не завершена при создании
+                    isDone: false,
                 };
                 this.columns[0].cards.push(newCard);
                 this.resetCardCreator();
@@ -156,27 +156,41 @@ Vue.component('notepad', {
             this.newCardContent = '';
             this.newCardItems = [];
             this.isCardLocked = false;
-            this.errorMessage = ''; // Сброс сообщения об ошибке
+            this.errorMessage = '';
         },
         moveCard({ cardId, fromColumnIndex }) {
             const card = this.columns[fromColumnIndex].cards.find(c => c.id === cardId);
             if (card) {
                 this.columns[fromColumnIndex].cards = this.columns[fromColumnIndex].cards.filter(c => c.id !== cardId);
-                this.columns[fromColumnIndex + 1].cards.push(card);
+
+
+                if (fromColumnIndex + 1 < this.columns.length) {
+                    const nextColumn = this.columns[fromColumnIndex + 1];
+                    if (nextColumn.cards.length < nextColumn.maxCards) {
+                        nextColumn.cards.push(card);
+                    } else {
+                        alert(`Столбец ${fromColumnIndex + 2} переполнен!`);
+
+                        this.columns[fromColumnIndex].cards.push(card);
+                    }
+                }
             }
         },
         handleUpdateCompletion(cardId) {
             const card = this.columns.flatMap(col => col.cards).find(c => c.id === cardId);
-            if (card && card.isDone) { // Проверяем, что карточка завершена
+            if (card) {
                 const completedCount = card.items.filter(item => item.completed).length;
                 const totalCount = card.items.length;
 
                 if (totalCount > 0) {
                     const completionPercentage = (completedCount / totalCount) * 100;
 
-                    if (completionPercentage >= 50 && this.columns[0].cards.includes(card)) {
+
+                    if (completionPercentage > 50 && this.columns[0].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 0 });
-                    } else if (completionPercentage === 100 && this.columns[1].cards.includes(card)) {
+                    }
+
+                    else if (completionPercentage === 100 && this.columns[1].cards.includes(card)) {
                         this.moveCard({ cardId, fromColumnIndex: 1 });
                         card.completedDate = new Date().toLocaleString();
                     }
@@ -186,8 +200,8 @@ Vue.component('notepad', {
         handleMarkAsDone(cardId) {
             const card = this.columns.flatMap(col => col.cards).find(c => c.id === cardId);
             if (card) {
-                card.isDone = true; // Помечаем карточку как завершенную
-                this.handleUpdateCompletion(cardId); // Активируем проверку условий перемещения
+                card.isDone = true;
+                this.handleUpdateCompletion(cardId);
             }
         },
     },
