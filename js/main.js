@@ -1,7 +1,7 @@
 Vue.component('Card', {
     template: `
     <div class="card">
-        <textarea v-model="card.content" placeholder="Введите заметку" :disabled="card.isLocked"></textarea>
+        <h3>{{ card.content }}</h3>
         <ul>
             <li v-for="(item, index) in card.items" :key="index">
                 <input 
@@ -9,7 +9,6 @@ Vue.component('Card', {
                     v-model="item.completed" 
                     :disabled="card.isLocked || item.completed" 
                     @change="handleCheckboxChange(item)" 
-                    @change="updateCompletion"
                 />
                 <span :class="{ completed: item.completed }">{{ item.text }}</span>
             </li>
@@ -75,52 +74,89 @@ Vue.component('notepad', {
                 @mark-as-done="handleMarkAsDone"
              />
             <div class="card-creator">
-                <textarea v-model="newCardContent" placeholder="Введите текст для новой карточки"></textarea>
+                <textarea v-model="newCardContent" placeholder="Введите заголовок карточки"></textarea>
                 <ul>
                     <li v-for="(item, index) in newCardItems" :key="index">
                         <input v-model="item.text" placeholder="Введите пункт" :disabled="isCardLocked" />
                         <button @click="removeItem(index)" :disabled="isCardLocked">Удалить</button>
                     </li>
                 </ul>
-                <button @click="addItem" :disabled="isCardLocked">Добавить пункт</button>
-                <button @click="addCard">Добавить карточку</button>
+                <button @click="addItem" :disabled="isCardLocked || newCardItems.length >= 5">Добавить пункт</button>
+                <button @click="addCard" :disabled="isAddCardDisabled">Добавить карточку</button>
+                <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
             </div>
         </div>
     `,
     data() {
         return {
             columns: [
-                { cards: [] },
-                { cards: [] },
-                { cards: [] },
+                { cards: [], maxCards: 3 }, // Первый столбец: не более 3 карточек
+                { cards: [], maxCards: 5 }, // Второй столбец: не более 5 карточек
+                { cards: [], maxCards: Infinity }, // Третий столбец: без ограничений
             ],
             newCardContent: '',
             newCardItems: [],
-            isCardLocked: false, // Блокировка редактирования после добавления карточки
+            isCardLocked: false,
+            errorMessage: '', // Сообщение об ошибке
         };
+    },
+    computed: {
+        isAddCardDisabled() {
+            // Кнопка "Добавить карточку" блокируется, если:
+            // 1. Первый столбец переполнен
+            // 2. Количество пунктов меньше 3 или больше 5
+            // 3. Заголовок карточки пустой
+            return (
+                this.columns[0].cards.length >= this.columns[0].maxCards ||
+                this.newCardItems.length < 3 ||
+                this.newCardItems.length > 5 ||
+                !this.newCardContent.trim()
+            );
+        },
     },
     methods: {
         addItem() {
-            this.newCardItems.push({ text: '', completed: false });
+            if (this.newCardItems.length < 5) {
+                this.newCardItems.push({ text: '', completed: false });
+                this.errorMessage = ''; // Сброс сообщения об ошибке
+            } else {
+                this.errorMessage = 'Максимальное количество пунктов — 5.';
+            }
         },
         removeItem(index) {
             this.newCardItems.splice(index, 1);
+            this.errorMessage = ''; // Сброс сообщения об ошибке
         },
         addCard() {
-            const newCard = {
-                id: Date.now(),
-                content: this.newCardContent,
-                items: this.newCardItems.map(item => ({ ...item })), // Копируем пункты
-                completedDate: null,
-                isDone: true, // Блокируем карточку после добавления
-            };
-            this.columns[0].cards.push(newCard);
-            this.resetCardCreator();
+            if (this.newCardItems.length < 3 || this.newCardItems.length > 5) {
+                this.errorMessage = 'Количество пунктов должно быть от 3 до 5.';
+                return;
+            }
+
+            if (!this.newCardContent.trim()) {
+                this.errorMessage = 'Заголовок карточки не может быть пустым.';
+                return;
+            }
+
+            if (this.columns[0].cards.length < this.columns[0].maxCards) {
+                const newCard = {
+                    id: Date.now(),
+                    content: this.newCardContent,
+                    items: this.newCardItems.map(item => ({ ...item })), // Копируем пункты
+                    completedDate: null,
+                    isDone: false, // Карточка не завершена при создании
+                };
+                this.columns[0].cards.push(newCard);
+                this.resetCardCreator();
+            } else {
+                this.errorMessage = 'Первый столбец переполнен.';
+            }
         },
         resetCardCreator() {
             this.newCardContent = '';
             this.newCardItems = [];
-            this.isCardLocked = false; // Сброс блокировки (если нужно)
+            this.isCardLocked = false;
+            this.errorMessage = ''; // Сброс сообщения об ошибке
         },
         moveCard({ cardId, fromColumnIndex }) {
             const card = this.columns[fromColumnIndex].cards.find(c => c.id === cardId);
@@ -155,7 +191,7 @@ Vue.component('notepad', {
             }
         },
     },
-})
+});
 
 let app = new Vue({
     el: '#app',
