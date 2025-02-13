@@ -1,13 +1,19 @@
 Vue.component('Card', {
     template: `
     <div class="card">
-        <textarea v-model="card.content" placeholder="Введите заметку" :disabled="card.isDone"></textarea>
+        <textarea v-model="card.content" placeholder="Введите заметку" :disabled="card.isLocked"></textarea>
         <ul>
-             <li v-for="(item, index) in card.items" :key="index">
-                 <input type="checkbox" v-model="item.completed" @change="updateCompletion" :disabled="!card.isDone" />
-                 <span :class="{ completed: item.completed }">{{ item.text }}</span>
-             </li>
-         </ul>
+            <li v-for="(item, index) in card.items" :key="index">
+                <input 
+                    type="checkbox" 
+                    v-model="item.completed" 
+                    :disabled="card.isLocked || item.completed" 
+                    @change="handleCheckboxChange(item)" 
+                    @change="updateCompletion"
+                />
+                <span :class="{ completed: item.completed }">{{ item.text }}</span>
+            </li>
+        </ul>
         <div v-if="card.completedDate">
             Завершено: {{ card.completedDate }}
         </div>
@@ -17,6 +23,9 @@ Vue.component('Card', {
         card: Object,
     },
     methods: {
+        handleCheckboxChange(item) {
+            item.completed = true;
+        },
         updateCompletion() {
             this.$emit('update-completion', this.card.id);
         },
