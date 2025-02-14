@@ -7,7 +7,6 @@ Vue.component('Card', {
                 <input 
                     type="checkbox" 
                     v-model="item.completed" 
-                    :disabled="card.isLocked || item.completed" 
                     @change="handleCheckboxChange(item)"
                     @change="updateCompletion()" 
                 />
@@ -39,6 +38,7 @@ Vue.component('Card', {
 Vue.component('column', {
     template: `
     <div class="column">
+        <p>Столбец {{ columnIndex + 1 }}</p>
         <div v-for="card in cards" :key="card.id">
           <Card :card="card" @move="handleMove(card.id)"
                 @update-completion="handleUpdateCompletion(card.id)"
@@ -67,17 +67,8 @@ Vue.component('column', {
 Vue.component('notepad', {
     template: `
         <div class="notepad">
-            <column
-                v-for="(column, index) in columns"
-                :key="index"
-                :cards="column.cards"
-                :columnIndex="index"
-                @move-card="moveCard"
-                @update-completion="handleUpdateCompletion"
-                @mark-as-done="handleMarkAsDone"
-             />
             <div class="card-creator">
-                <textarea v-model="newCardContent" placeholder="Введите заголовок карточки"></textarea>
+                <input v-model="newCardContent" placeholder="Введите заголовок карточки"></input>
                 <ul>
                     <li v-for="(item, index) in newCardItems" :key="index">
                         <input v-model="item.text" placeholder="Введите пункт" :disabled="isCardLocked" />
@@ -88,6 +79,16 @@ Vue.component('notepad', {
                 <button @click="addCard" :disabled="isAddCardDisabled">Добавить карточку</button>
                 <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
             </div>
+            <column
+                v-for="(column, index) in columns"
+                :key="index"
+                :cards="column.cards"
+                :columnIndex="index"
+                @move-card="moveCard"
+                @update-completion="handleUpdateCompletion"
+                @mark-as-done="handleMarkAsDone"
+             />
+            
         </div>
     `,
     data() {
